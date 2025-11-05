@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Nishant Singh",
+    "reg": "FE123",
+    "track": "Frontend",
+    "attended": true
+  },
+  {
+    "name": "Jane Doe",
+    "reg": "BE987",
+    "track": "Backend",
+    "attended": true
+  },
+  {
+    "name": "Rahul Sharma",
+    "reg": "FE456",
+    "track": "Frontend",
+    "attended": false
+  },
+  {
+    "name": "Priya Mehta",
+    "reg": "BE789",
+    "track": "Backend",
+    "attended": false
+  },
+  {
+    "name": "Aditi Verma",
+    "reg": "FE789",
+    "track": "Frontend",
+    "attended": true
+  },
+  {
+    "name": "Rohan Gupta",
+    "reg": "BE321",
+    "track": "Backend",
+    "attended": true
+  },
+  {
+    "name": "Sneha Patel",
+    "reg": "FE654",
+    "track": "Frontend",
+    "attended": false
+  },
+  {
+    "name": "Aman Yadav",
+    "reg": "BE456",
+    "track": "Backend",
+    "attended": true
+  },
+  {
+    "name": "Kritika Singh",
+    "reg": "FE321",
+    "track": "Frontend",
+    "attended": true
+  },
+  {
+    "name": "Arjun Reddy",
+    "reg": "BE654",
+    "track": "Backend",
+    "attended": false
+  }
+]
