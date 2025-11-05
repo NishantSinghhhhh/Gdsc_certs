@@ -40,7 +40,6 @@ const attendeeSchema = new Schema<IAttendee>(
   },
   { timestamps: true, collection: "Certificate" }
 )
-// optional unique index per (reg, track)
 attendeeSchema.index({ reg: 1, track: 1 }, { unique: false })
 
 // Log issued certs in a clean separate collection
@@ -61,6 +60,9 @@ const Certificate: Model<ICertificate> =
   (models.Certificate as Model<ICertificate>) ||
   model<ICertificate>("Certificate", certificateLogSchema)
 
+// --- helper for robust name comparisons (ignore extra spaces & case)
+const normalizeName = (s: string) => s.replace(/\s+/g, " ").trim().toUpperCase()
+
 // ====== Route ======
 export async function POST(req: NextRequest) {
   console.log("[CERT API] POST request received")
@@ -69,23 +71,24 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     console.log("[CERT API] Request body:", body)
 
-    const { reg, track }: { name?: string; reg: string; track: Track } = body
+    // CHANGED: require `name` from frontend
+    const { name, reg, track }: { name: string; reg: string; track: Track } = body
 
-    if (!reg?.trim() || !track) {
-      console.log("[CERT API] Invalid payload - reg or track missing")
+    if (!name?.trim() || !reg?.trim() || !track) {
+      console.log("[CERT API] Invalid payload - name, reg or track missing")
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 })
     }
 
-    // Normalize inputs to match schema & stored docs
+    // Normalize inputs
     const normReg = reg.trim().toUpperCase()
     const normTrack: Track = track === "Backend" ? "Backend" : "Frontend"
+    const normNameInput = normalizeName(name)
 
     console.log("[CERT API] Connecting to database...")
     await connectDB()
     console.log("[CERT API] Database connected successfully")
     console.log("[CERT API] Connected DB:", mongoose.connection.name)
 
-    // ✅ Fix: safely narrow `mongoose.connection.db` before using it
     const db = mongoose.connection.db
     if (db) {
       const cols = await db.listCollections().toArray()
@@ -96,7 +99,6 @@ export async function POST(req: NextRequest) {
 
     console.log("[CERT API] Looking up attendee with:", { reg: normReg, track: normTrack })
 
-    // Typed lean result so TS knows .attended and .name exist
     const attendee = await Attendee.findOne({ reg: normReg, track: normTrack })
       .lean<IAttendee>()
       .exec()
@@ -122,9 +124,19 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // NEW: verify frontend-provided name matches DB name (case/spacing-insensitive)
+    const normNameFromDB = normalizeName(nameFromDB)
+    if (normNameInput !== normNameFromDB) {
+      console.log("[CERT API] Name mismatch:", { frontend: normNameInput, db: normNameFromDB })
+      return NextResponse.json(
+        { error: "Name does not match our records for this registration number." },
+        { status: 403 }
+      )
+    }
+
     console.log("[CERT API] Creating certificate record in database...")
     const certRecord = await Certificate.create({
-      name: nameFromDB,
+      name: nameFromDB, // always store canonical DB name
       reg: normReg,
       track: normTrack,
     })
@@ -148,13 +160,10 @@ export async function POST(req: NextRequest) {
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
-    const centerX = (text: string, size: number, f = font) =>
-      (width - f.widthOfTextAtSize(text, size)) / 2
     const yFromTop = (t: number) => height - t
 
-    const nameLine = nameFromDB
+    const nameLine = nameFromDB // draw canonical name from DB
     const regLine = `Registration No: ${normReg}`
-    const footer = `Issued on ${new Date().toLocaleDateString()}`
 
     console.log("[CERT API] Drawing text on PDF...")
     page.drawText(nameLine, {
@@ -193,6 +202,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to generate certificate" }, { status: 500 })
   } finally {
     console.log("[CERT API] Request processing complete")
-    // keep pooled connection open
   }
 }
